@@ -72,8 +72,8 @@ fn parse_command() -> AppResult<Command> {
     let text = String::from(matches.value_of("TEXT").unwrap());
     let output = matches.value_of("OUTPUT").map(PathBuf::from);
 
-    let settings = GenerateOptions { text, output };
-    Ok(Command::GenerateCode(settings))
+    let generate_options = GenerateOptions { text, output };
+    Ok(Command::GenerateCode(generate_options))
 }
 
 fn output_file(code: &QrCode, path: &Path) -> AppResult<()> {
