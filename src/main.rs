@@ -16,7 +16,7 @@ use qrcode::QrCode;
 #[derive(Debug, Parser)]
 #[command(author, version, about = "QRコードを生成します。")]
 struct GenerateOptions {
-    /// QRコードに埋め込む文字列を指定してください。省略した場合は標準出力の内容を埋め込みます。
+    /// QRコードに埋め込む文字列を指定してください。省略した場合は標準入力の内容を埋め込みます。
     text: Option<String>,
 
     /// 出力先のファイルパスを指定してください。省略した場合は標準出力にQRコードを表示します。
