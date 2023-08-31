@@ -40,6 +40,9 @@ enum AppError {
 
     #[fail(display = "io error: {}", err)]
     IoError { err: io::Error },
+
+    #[fail(display = "image error: {}", err)]
+    ImageError { err: image::ImageError },
 }
 
 impl From<QrError> for AppError {
@@ -51,6 +54,12 @@ impl From<QrError> for AppError {
 impl From<io::Error> for AppError {
     fn from(err: io::Error) -> Self {
         AppError::IoError { err }
+    }
+}
+
+impl From<image::ImageError> for AppError {
+    fn from(err: image::ImageError) -> Self {
+        AppError::ImageError { err }
     }
 }
 
