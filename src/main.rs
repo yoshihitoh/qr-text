@@ -1,23 +1,26 @@
 extern crate clap;
 extern crate image;
 extern crate qrcode;
-
-#[macro_use]
-extern crate failure;
+extern crate thiserror;
 
 use std::io;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process;
 
-use clap::{App, Arg};
-
+use clap::Parser;
 use image::Luma;
-
-use qrcode::QrCode;
 use qrcode::types::QrError;
+use qrcode::QrCode;
 
+#[derive(Debug, Parser)]
+#[command(author, version, about = "QRコードを生成します。")]
 struct GenerateOptions {
-    text: String,
+    /// QRコードに埋め込む文字列を指定してください。省略した場合は標準出力の内容を埋め込みます。
+    text: Option<String>,
+
+    /// 出力先のファイルパスを指定してください。省略した場合は標準出力にQRコードを表示します。
+    #[arg(short, long, value_name = "FILE")]
     output: Option<PathBuf>,
 }
 
@@ -27,52 +30,20 @@ enum Command {
 
 type AppResult<T> = Result<T, AppError>;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 enum AppError {
-    #[fail(display = "qr code error: {}", err)]
-    QrError { err: QrError },
+    #[error("qr code error")]
+    QrCode(#[from] QrError),
 
-    #[fail(display = "io error: {}", err)]
-    IoError { err: io::Error },
-}
+    #[error("io error")]
+    Io(#[from] io::Error),
 
-impl From<QrError> for AppError {
-    fn from(err: QrError) -> Self {
-        AppError::QrError { err }
-    }
-}
-
-impl From<io::Error> for AppError {
-    fn from(err: io::Error) -> Self {
-        AppError::IoError { err }
-    }
+    #[error("image error")]
+    Image(#[from] image::ImageError),
 }
 
 fn parse_command() -> AppResult<Command> {
-    let matches = App::new("qr-text")
-        .version("0.0.1")
-        .author("yoshihitoh")
-        .about("指定した文字列のQRコードを生成します。")
-        .arg(
-            Arg::with_name("OUTPUT")
-                .short("o")
-                .long("output")
-                .value_name("FILE")
-                .takes_value(true)
-                .help("出力先のファイルパスを指定してください。"),
-        )
-        .arg(
-            Arg::with_name("TEXT")
-                .required(true)
-                .help("QRコードに埋め込む文字列を指定してください。"),
-        )
-        .get_matches();
-
-    // text: NOTE: required指定のパラメタなので unwrap で取り出す
-    let text = String::from(matches.value_of("TEXT").unwrap());
-    let output = matches.value_of("OUTPUT").map(PathBuf::from);
-
-    let generate_options = GenerateOptions { text, output };
+    let generate_options = GenerateOptions::parse();
     Ok(Command::GenerateCode(generate_options))
 }
 
@@ -88,7 +59,8 @@ fn output_file(code: &QrCode, path: &Path) -> AppResult<()> {
 
 fn output_stdout(code: &QrCode) -> AppResult<()> {
     // 文字列に変換する
-    let text = code.render::<char>()
+    let text = code
+        .render::<char>()
         .quiet_zone(false)
         .module_dimensions(2, 1)
         .build();
@@ -99,9 +71,19 @@ fn output_stdout(code: &QrCode) -> AppResult<()> {
     Ok(())
 }
 
-fn generate_code(generate_options: &GenerateOptions) -> AppResult<()> {
+fn generate_code(generate_options: GenerateOptions) -> AppResult<()> {
+    fn content_from_stdin() -> AppResult<Vec<u8>> {
+        let mut content = Vec::default();
+        io::stdin().read_to_end(&mut content)?;
+        Ok(content)
+    }
+
     // QRコード生成
-    let code = QrCode::new(generate_options.text.as_bytes())?;
+    let content = generate_options
+        .text
+        .map(|s| Ok(s.as_bytes().to_vec()))
+        .unwrap_or_else(content_from_stdin)?;
+    let code = QrCode::new(&content)?;
 
     // 出力先が指定されている場合は画像に、ない場合は標準出力にテキストで表示する
     match generate_options.output.as_ref() {
@@ -112,7 +94,7 @@ fn generate_code(generate_options: &GenerateOptions) -> AppResult<()> {
 
 fn run() -> AppResult<()> {
     match parse_command()? {
-        Command::GenerateCode(generate_options) => generate_code(&generate_options),
+        Command::GenerateCode(generate_options) => generate_code(generate_options),
     }
 }
 
