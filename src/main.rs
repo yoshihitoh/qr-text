@@ -1,18 +1,14 @@
 extern crate clap;
 extern crate image;
 extern crate qrcode;
-
-#[macro_use]
-extern crate failure;
+extern crate thiserror;
 
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::Parser;
-
 use image::Luma;
-
 use qrcode::types::QrError;
 use qrcode::QrCode;
 
@@ -33,34 +29,16 @@ enum Command {
 
 type AppResult<T> = Result<T, AppError>;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 enum AppError {
-    #[fail(display = "qr code error: {}", err)]
-    QrError { err: QrError },
+    #[error("qr code error")]
+    QrCode(#[from] QrError),
 
-    #[fail(display = "io error: {}", err)]
-    IoError { err: io::Error },
+    #[error("io error")]
+    Io(#[from] io::Error),
 
-    #[fail(display = "image error: {}", err)]
-    ImageError { err: image::ImageError },
-}
-
-impl From<QrError> for AppError {
-    fn from(err: QrError) -> Self {
-        AppError::QrError { err }
-    }
-}
-
-impl From<io::Error> for AppError {
-    fn from(err: io::Error) -> Self {
-        AppError::IoError { err }
-    }
-}
-
-impl From<image::ImageError> for AppError {
-    fn from(err: image::ImageError) -> Self {
-        AppError::ImageError { err }
-    }
+    #[error("image error")]
+    Image(#[from] image::ImageError),
 }
 
 fn parse_command() -> AppResult<Command> {
